@@ -4,3 +4,14 @@ backgroundColor = "#0B1120"
 secondaryBackgroundColor = "#172033"
 textColor = "#E5E7EB"
 font = "sans serif"
+base = "dark"
+
+[theme.sidebar]
+backgroundColor = "#111827"
+secondaryBackgroundColor = "#1E293B"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false
