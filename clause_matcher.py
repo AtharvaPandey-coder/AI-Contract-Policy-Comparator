@@ -24,8 +24,3 @@ def align_clause(chunks_a,index_b,top_k=1):
             'score':score # lower=more similar (FAISS returns L2 distance)
         })
     return pairs
-
-
-
-
-

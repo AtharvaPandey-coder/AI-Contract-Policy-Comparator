@@ -20,12 +20,7 @@ def load_chunk(pdfpath:str)->str:
 
     for i,chunk in enumerate(chunks):
         chunk.metadata['chunk_id']=i
-    return chunks
-
-
-
-
-
+    return chunks        
 
 
 
