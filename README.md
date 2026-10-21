@@ -1,3 +1,8 @@
+
+## 🚀 Try the Live App
+
+👉 **[Click here to try the AI Contract & Policy Comparator](https://ai-contract-policy-comparator.streamlit.app/)**
+
 # Contract / Policy Comparator Agent
 
 An AI agent that compares two versions of a contract or policy (PDF), finds which clauses were changed, added or removed, and classifies each change by type and risk level with a short explanation.
