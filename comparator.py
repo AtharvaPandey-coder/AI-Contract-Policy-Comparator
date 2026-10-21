@@ -1,5 +1,7 @@
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
+from pydantic import BaseModel,Field
+from typing import Literal
 import os
 from dotenv import load_dotenv
 load_dotenv()
@@ -52,6 +54,10 @@ def parse_response(text:str)->dict:
         result['risk_level']='Low' 
         
     return result
+
+
+
+
 
 
 
