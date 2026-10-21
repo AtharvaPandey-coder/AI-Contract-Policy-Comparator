@@ -1,48 +1,86 @@
-Contract / Policy Comparator Agent
+# Contract / Policy Comparator Agent
 
-An agentic system that compares two contract or policy documents (PDFs) clause-by-clause, semantically aligns clauses even when reworded, and uses an LLM to classify each change by type and risk level.
+An AI agent that compares two versions of a contract or policy (PDF), finds which clauses were changed, added or removed, and classifies each change by type and risk level with a short explanation.
 
-What it does
+## The problem
 
-Given two versions of a contract or policy (e.g. an older and a newer version), the agent:
+Reviewing a new version of a contract or policy means reading both documents side by side and checking every clause. Clauses get reworded, moved or dropped, so a plain text diff misses most of what matters. This project automates that check and returns a short report of only the clauses that changed.
 
-Extracts and chunks the text of both documents
-Semantically matches each clause in Document A to its closest counterpart in Document B — so a reworded clause is still correctly paired, not just an exact-text match
-Sends each matched clause pair to an LLM to classify the change (No Change / Reworded / Materially Changed / Removed / Added), assign a risk level (Low / Medium / High), and explain why
-Returns a report of only the clauses that actually changed
-Tech stack
-LangChain (create_agent, tool-calling) — agent orchestration
-Groq (openai/gpt-oss-120b) — LLM for clause comparison and reasoning
-sentence-transformers (all-MiniLM-L6-v2) via langchain-huggingface — local embeddings for semantic clause matching
-FAISS — vector similarity search to align clauses between documents
-pypdf (PyPDFLoader) — PDF text extraction
-Streamlit — web UI for uploading documents and viewing the report
-Project structure
-├── document_loader.py   # Loads a PDF and splits it into clause-sized chunks
-├── clause_matcher.py     # Embeds chunks and finds each clause's closest semantic match in the other document
-├── comparator.py         # Sends matched clause pairs to the LLM for change-type and risk classification
-├── agent.py               # Wraps the pipeline as a LangChain tool-calling agent
-├── app.py                 # Streamlit UI for uploading documents and viewing the report
-└── .env                    # Holds GROQ_API_KEY (not committed)
-How it works
-document_loader.py reads each PDF page-by-page and splits it into ~800-character chunks, trying to break at paragraph or sentence boundaries so clauses stay intact.
-clause_matcher.py embeds Document B's chunks into a FAISS index. For every chunk in Document A, it searches that index for the closest match by meaning, not exact words — this is what allows it to catch a clause that was reworded rather than deleted.
-comparator.py takes each matched pair and asks the LLM (temperature 0, for consistent output) to classify the change type, assign a risk level, and give a short explanation, in a fixed, parseable format.
-agent.py wires the above into a single LangChain tool (compare_documents) that an agent calls when given two document paths, then returns the compiled report.
-app.py provides a simple upload-two-PDFs-and-compare interface using Streamlit.
-Setup
-bash
+## How it works
+
+1. **Load and chunk:** each PDF is read and split into small, clause-sized chunks.
+2. **Embed and index:** the chunks of Document B are embedded and stored in a FAISS index.
+3. **Semantic alignment:** each chunk of Document A is searched against that index to find its closest match in Document B by meaning, so a reworded clause is still paired correctly.
+4. **LLM verdict:** each matched pair goes to the LLM, which returns a structured verdict: `change_type`, `risk_level` and `explaination`.
+5. **Filter and report:** clauses marked "No Change" are dropped. Chunks in Document B that no clause in Document A matched are reported as "Added".
+6. **Agent:** the whole pipeline is wrapped as a tool (`compare_documents`) that a LangChain agent calls and returns verbatim.
+
+```
+PDF A, PDF B
+   -> chunks
+   -> FAISS index of B
+   -> A-to-B semantic matching
+   -> LLM verdict per pair
+   -> filtered report
+```
+
+## Tech stack
+
+- **LangChain:** agent (`create_agent`) and tool calling
+- **Groq** (`openai/gpt-oss-120b`): clause comparison and risk classification
+- **Pydantic structured output:** forces the verdict into fixed fields (change type, risk level, explanation)
+- **sentence-transformers** (`all-MiniLM-L6-v2`): local embeddings
+- **FAISS:** vector similarity search for clause alignment
+- **PyPDFLoader (pypdf):** PDF text extraction
+- **Streamlit:** web UI for uploading the two documents
+
+## Setup
+
+```bash
 pip install langchain langchain-groq langchain-huggingface langchain-community pypdf faiss-cpu sentence-transformers streamlit python-dotenv
+```
 
-Create a .env file in the project root:
+Create a `.env` file in the project folder:
 
+```
 GROQ_API_KEY=your_key_here
-Run
-bash
+```
+
+Get a free key at console.groq.com.
+
+## Run
+
+```bash
 streamlit run app.py
+```
 
-Upload two PDF versions of a contract or policy and click Compare.
+Upload the older version as Document A and the newer version as Document B, then click Compare.
 
-Example use case
+## Example output
 
-Tested against real, publicly filed SEC EDGAR consulting agreements to verify the pipeline correctly identifies additions, removals, and material rewording between two independently drafted documents of the same type.
+Each changed clause appears as one line:
+
+```
+[High] [Materially Changed] [Retention period increased from 2 years to 5 years and the legal-requirement exception was removed.]
+[High] [Materially Changed] [External sharing no longer requires employee consent.]
+[Medium] [Added] [A new clause allows automated productivity evaluation with no process to challenge it.]
+```
+
+## Testing
+
+Tested on:
+- a sample Employee Data Protection Policy (original vs revised version) with known changes: retention period, data sharing consent, removed correction rights and a new automated decision-making clause
+- real consulting agreements filed with the SEC (EDGAR), which have different structure and wording
+
+## Design notes
+
+- **Chunk size 400, overlap 0:** keeps each chunk close to one clause. Overlap is avoided because it would repeat the same sentence in two chunks and blur the matching.
+- **Structured output instead of text parsing:** the LLM fills fixed fields, so the risk level can only be Low, Medium or High and no output parsing is needed.
+- **Added clauses:** the A-to-B matching only finds counterparts for clauses in A, so unmatched chunks in B are reported separately as additions.
+- **Agent prompt:** the agent returns the tool report verbatim, so the model cannot reword the risk labels.
+
+## Limitations
+
+- Works on text-based PDFs only. Scanned PDFs need OCR first.
+- Matching is one-to-one from A to B, so if two clauses in A map to the same clause in B, one of them may be paired imprecisely.
+- LLM risk levels are a first-pass screen and not legal advice.
