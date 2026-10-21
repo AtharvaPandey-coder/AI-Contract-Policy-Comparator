@@ -15,7 +15,7 @@ CLAUSE FROM DOCUMENT B
 
 Respond in this exact format:
 CHANGE_TYPE: [No Change / Reworked (same meaning) / Materially Changed / Removed / Added]
-RISK_LEVEL:[Low / Medium / Hard]
+RISK_LEVEL:[Low / Medium / High]
 EXPLAINATION: <1-2 sentences on what Changed and why it matters >.
 """)
 
@@ -28,16 +28,30 @@ def comparison_clause(clause_a:str,clause_b:str)->dict:
 
 def parse_response(text:str)->dict:
     """Turns the LLm's structure text reply into a dict for the UI table"""
+    print(repr(text))
     result ={'change_type':"",'risk_level':"",'explaination':""}
+    current=None
     for line in text.strip().split("\n"):
-        if line.startswith("CHANGE_TYPE:"):
-            result['change_type']=line.replace("CHANGE_TYPE:","").strip()
-        elif line.startswith("RISK_LEVEL"):
-            result['risk_level']=line.replace("RISK_LEVEL:","").strip()
-        elif line.startswith("EXPLAINATION"):
-            result['explaination']=line.replace("EXPLAINATION","").strip()
-    return result
+        line=line.replace("*","").strip()
+        if line.upper().startswith("CHANGE_TYPE:"):
+            result['change_type']=line.split(":",1)[1].strip()
+        elif line.upper().startswith("RISK_LEVEL"):
+            result['risk_level']=line.split(":",1)[1].strip()
+        elif line.upper().startswith("EXPLAIN"):
+            result["explaination"]=line.split(":",1)[1].strip()
+            current='explaination'
+        elif current=='explaination' and line:
+            result['explaination'] += " "+ line
 
+    r=result['risk_level'].lower()
+    if "high" in r:
+        result['risk_level']='High'
+    elif "med" in r:
+        result['risk_level']='Medium'
+    elif 'low' in r:
+        result['risk_level']='Low' 
+        
+    return result
 
 
 

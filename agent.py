@@ -19,7 +19,7 @@ def compare_documents(path_a:str,path_b:str)->str:
     report_lines=[]
     for pair in pairs:
         verdict=comparison_clause(pair['clause_a'],pair['clause_b'])
-        if verdict['change_type'] != "No Change":
+        if "no change" not in verdict['change_type'].lower():
             report_lines.append(f"[{verdict['risk_level']}] [{verdict['change_type']}] [{verdict['explaination']}]"
             )
     return "\n".join(report_lines) if report_lines else "No Material difference found!."

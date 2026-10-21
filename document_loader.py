@@ -12,8 +12,8 @@ def load_chunk(pdfpath:str)->str:
     docs=loader.load()
 
     splitter=RecursiveCharacterTextSplitter(
-        chunk_size=800,
-        chunk_overlap=100,
+        chunk_size=400,
+        chunk_overlap=0,
         separators=["\n\n","\n"," "]#tries paragraph breaks first and then sentences.
     )
     chunks=splitter.split_documents(docs)
