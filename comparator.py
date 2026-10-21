@@ -6,55 +6,47 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 llm=ChatGroq(model='openai/gpt-oss-120b',temperature=0,api_key=os.getenv('GROQ_API_KEY'))
+
+
+class Verdict(BaseModel):
+    change_type:Literal['No Change','Reworked','Materially Changed','Removed','Added']
+    risk_level:Literal['Low','Medium','High']
+    explaination:str= Field(description="1-2 sentences on what changed and why it matters")
+
+
+structured_llm=llm.with_structured_output(Verdict,method='json_schema')
+
 comparison_prompt=ChatPromptTemplate.from_template("""
-You are a contract review assistant.Compare these two clause versions.
+You are a contract and policy comparison assistant.
 
+Document A is the ORIGINAL, OLDER version.
+Document B is the REVISED, NEWER version.
 
-CLAUSE FROM DOCUMENT A
+Compare the clauses carefully.
+
+Rules:
+- No Change: Meaning and obligations remain substantially the same.
+- Reworked: Wording changed, but the meaning remains substantially the same.
+- Materially Changed: Rights, obligations, duration, permissions, or risks changed.
+- Removed: An original clause is absent from the revised document.
+- Added: A clause exists in the revised document but not the original.
+- Assess risk based on the practical impact of the change.
+- Do not invent facts that are not present in the clauses.
+- If a placeholder says no corresponding clause exists, treat it as a missing clause.
+- If a clause is added or removed, explain the practical implication.
+
+ORIGINAL CLAUSE:
 {clause_a}
-CLAUSE FROM DOCUMENT B
-{clause_b}
 
-Respond in this exact format:
-CHANGE_TYPE: [No Change / Reworked (same meaning) / Materially Changed / Removed / Added]
-RISK_LEVEL:[Low / Medium / High]
-EXPLAINATION: <1-2 sentences on what Changed and why it matters >.
+REVISED CLAUSE:
+{clause_b}
 """)
 
-def comparison_clause(clause_a:str,clause_b:str)->dict:
-    """ Sends one alingned clause pair to the LLm and parses its structured verdict."""
-    chain=comparison_prompt | llm
+
+def comparison_clause(clause_a:str,clause_b:str):
+    chain = comparison_prompt | structured_llm
     result=chain.invoke({'clause_a':clause_a,'clause_b':clause_b})
-    return parse_response(result.content)
-
-
-def parse_response(text:str)->dict:
-    """Turns the LLm's structure text reply into a dict for the UI table"""
-    print(repr(text))
-    result ={'change_type':"",'risk_level':"",'explaination':""}
-    current=None
-    for line in text.strip().split("\n"):
-        line=line.replace("*","").strip()
-        if line.upper().startswith("CHANGE_TYPE:"):
-            result['change_type']=line.split(":",1)[1].strip()
-        elif line.upper().startswith("RISK_LEVEL"):
-            result['risk_level']=line.split(":",1)[1].strip()
-        elif line.upper().startswith("EXPLAIN"):
-            result["explaination"]=line.split(":",1)[1].strip()
-            current='explaination'
-        elif current=='explaination' and line:
-            result['explaination'] += " "+ line
-
-    r=result['risk_level'].lower()
-    if "high" in r:
-        result['risk_level']='High'
-    elif "med" in r:
-        result['risk_level']='Medium'
-    elif 'low' in r:
-        result['risk_level']='Low' 
-        
-    return result
-
+    return result.model_dump()
 
 
 
